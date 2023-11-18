@@ -1,0 +1,218 @@
+import requests
+from bs4 import BeautifulSoup
+import datetime
+from tkinter import _flatten
+import pandas as pd
+now = datetime.datetime.now(tz=datetime.timezone(datetime.timedelta(hours=8)))
+def color_rule1(val):
+    return ['background-color: red' for x in val if x > 0 ]
+def color_rule2(val):
+    return ['background-color: red' for x in val if x > 3000 ]
+
+#html_column = df.style.apply(color_rule,  subset=['data1', 'dat2'])
+def getdata(n, respond):
+    url_first = 'https://tw.stock.yahoo.com/class-quote?sectorId='
+    if respond == '1':
+        url_last = '&exchange=TAI'
+    elif respond == '2':
+        url_last = '&exchange=TWO'
+    html = url_first + n + url_last
+    html = requests.get(html)
+    html.encoding = 'UTF-8'
+    html = BeautifulSoup(html.text, 'lxml')
+    html2 = html.find(class_="table-body-wrapper")
+    stock_name = html2.find_all(class_="Lh(20px) Fw(600) Fz(16px) Ell")
+    stock_serial = html2.find_all(class_="Fz(14px) C(#979ba7) Ell")
+    stock_amount = html2.find_all(class_="Jc(fe)")
+    
+    num = len(stock_name)
+    name = [ 0 for _ in range(num) ]
+    serial = [ 0 for _ in range(num) ]
+    amount = [ [0 for _ in range(8)] for _ in range(num) ]
+    closing_price = [0 for _ in range(num)]
+    swing = [0 for _ in range(num)]
+    swing_percentage = [0 for _ in range(num)]
+    opening_price = [0 for _ in range(num)]
+    closing_price_yer = [0 for _ in range(num)]
+    highest_price = [0 for _ in range(num)]
+    lowest_price = [0 for _ in range(num)]
+    trading_volume = [0 for _ in range(num)]
+    # 儲存股票名稱
+    for i,j in enumerate(stock_name) :
+        name[i] = j.text
+    # 儲存股票代號
+    for i,j in enumerate(stock_serial):
+        serial[i] = j.text
+    # 儲存股票價錢
+    for i,j in enumerate(stock_amount):
+        amount[ int( i / 8 ) ][ i % 8 ] = j.text
+    for i, j in enumerate(amount):
+            if j[0] == '-' and j[4] == '-':
+                closing_price[i] = j[0] 
+                swing[i] = j[1]
+                swing_percentage[i] = j[2]
+                opening_price[i] = j[3]
+                closing_price_yer[i] = j[4]
+                highest_price[i] = j[5]
+                lowest_price[i] = j[6]
+                trading_volume[i] = j[7]
+            elif j[0] != '-' and j[4] == '-':
+                closing_price[i] = float(j[0].replace(",",""))
+                swing[i] = j[1]
+                swing_percentage[i] = j[2]
+                opening_price[i] = float(j[3].replace(",",""))
+                closing_price_yer[i] = float(j[4].replace(",",""))
+                highest_price[i] = float(j[5].replace(",",""))
+                lowest_price[i] = float(j[6].replace(",",""))
+                trading_volume[i] = float(j[7].replace(",",""))
+            elif j[0] == '-' and j[4] != '-':
+                closing_price[i] = j[0] 
+                swing[i] = j[1]
+                swing_percentage[i] = j[2]
+                opening_price[i] = j[3]
+                closing_price_yer[i] = float(j[4].replace(",",""))
+                highest_price[i] = j[5]
+                lowest_price[i] = j[6]
+                trading_volume[i] = j[7]
+            else:
+                if float(j[0].replace(",","")) < float(j[4].replace(",","")):
+                    closing_price[i] = float(j[0].replace(",",""))
+                    swing[i] = -float(j[1].replace(",",""))
+                    swing_percentage[i] = '-' + j[2]
+                    opening_price[i] = float(j[3].replace(",",""))
+                    closing_price_yer[i] = float(j[4].replace(",",""))
+                    highest_price[i] = float(j[5].replace(",",""))
+                    lowest_price[i] = float(j[6].replace(",",""))
+                    trading_volume[i] = float(j[7].replace(",",""))
+                else:
+                    closing_price[i] = float(j[0].replace(",",""))
+                    swing[i] = float(j[1].replace(",",""))
+                    swing_percentage[i] = j[2]
+                    opening_price[i] = float(j[3].replace(",",""))
+                    closing_price_yer[i] = float(j[4].replace(",",""))
+                    highest_price[i] = float(j[5].replace(",",""))
+                    lowest_price[i] = float(j[6].replace(",",""))
+                    trading_volume[i] = float(j[7].replace(",",""))
+                    
+    key = ["name", "serial", "closing_price", "swing", "swing_percentage",
+           "opening_price", "closing_price_yer", "highest_price", "lowest_price"
+           , "trading_volume"]
+    value = [name, serial, closing_price, swing, swing_percentage,
+           opening_price, closing_price_yer, highest_price, lowest_price
+           , trading_volume]
+    total = {key: value for key, value in zip(key, value)}
+    total = pd.DataFrame(total)      
+    # 由大排到小
+    return total 
+'''
+def gettop(total, n):
+    #total.sort(key = lambda x:x[4] , reverse = True)
+    print("股票名稱   股票序號   收盤價   漲幅   漲幅%數   成交量")
+    if len(total) < n :
+        for i in range(len(total)):
+            print(total[i][0], total[i][1], total[i][2], total[i][3], total[i][4], total[i][9] )
+    else:
+        for i in range( n ):
+            print(total[i][0], total[i][1], total[i][2], total[i][3], total[i][4], total[i][9])
+'''
+def getcsv(total, file_name):    
+    '''
+    F =  open( datetime.today().strftime('%Y%m%d') + '-' + file_name, 'w', newline='' )
+    W = csv.writer( F )
+    for r in total:
+        W.writerow( r )    
+    F.close( )
+    "name", "serial", "closing_price", "swing", "swing_percentage",
+           "opening_price", "closing_price_yer", "highest_price", "lowest_price"
+           , "trading_volume"
+    '''
+    total.style.apply(color_rule1,  subset=['swing', 'swing_percentage'])
+    total.style.apply(color_rule2, subset = ['trading_volume'])
+    total.to_csv(file_name, encoding = 'utf-8-sig')
+    
+box = ['5', '2', '3', '4']
+
+while True:
+    print('請輸入欲查詢之種類')
+    print('上市類股(1)、上櫃類股(2)或按X離開')
+    respond = input("請輸入: ")
+    if respond == '1':
+        path = '上市類股索引.txt'
+        f = open(path, 'r', encoding = 'UTF_8-sig' )
+        for line in f.readlines():
+            print(line, end ='')
+        f.close
+        
+        a = input('請輸入類股編號: ')
+        
+        f = open(path, 'r', encoding = 'UTF_8-sig' )
+        index = [i for i in f.readlines()]
+        f.close
+        index_all = [0 for _ in range(len(index))]
+        for i,j in enumerate(index):
+            index_all[i] = j.strip('\n').split(' ')
+        
+        if a  in _flatten(index_all):
+            for i,j in enumerate(_flatten(index_all)):
+                if a == j:
+                    file_name = str(now.date()) + '-上櫃類股索引-' + _flatten(index_all)[i-1] + '.csv'
+            #b = input('請輸入欲察看前幾名的類股: ')
+            total = getdata(a, respond)
+            print(total)
+            '''
+            if b.lower() == 'all':
+                gettop( total, len(total))
+            else:
+                gettop( total, b)
+            '''
+            
+            getcsv(total, file_name)
+            print('CSV檔已儲存')
+            input('按enter以繼續: ')
+            print('\n')
+        else:
+            print('wrong input!')
+    elif respond == '2':
+        path = '上櫃類股索引.txt'
+        f = open(path, 'r', encoding = 'UTF_8-sig' )
+        for line in f.readlines():
+            print(line, end ='')
+        f.close
+        
+        a = input('請輸入類股編號: ')
+        
+        f = open(path, 'r', encoding = 'UTF_8-sig' )
+        index = [i for i in f.readlines()]
+        f.close
+        index_all = [0 for _ in range(len(index))]
+        for i,j in enumerate(index):
+            index_all[i] = j.strip('\n').split(' ')
+        
+        if a  in _flatten(index_all):
+            for i,j in enumerate(_flatten(index_all)):
+                if a == j:
+                    file_name = str(now.date()) + '-上櫃類股索引-' + _flatten(index_all)[i-1] + '.csv'
+            #b = input('請輸入欲察看前幾名的類股: ')
+            total = getdata(a, respond)
+            
+            '''
+            if b.lower() == 'all':
+                gettop( total, len(total))
+            else:
+                gettop( total, b)
+            '''
+           
+            getcsv(total, file_name)
+            print('CSV檔已儲存')
+            input('按enter以繼續: ')
+            print('\n')
+        else:
+            print('wrong input!')
+    elif respond in box :
+        print("此項功能尚未開通")
+    elif respond.lower() == 'x':
+        print('tks!')
+        break
+    else:
+        print('輸入錯誤')
+        
